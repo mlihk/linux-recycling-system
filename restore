@@ -1,0 +1,54 @@
+#!/bin/bash
+
+usage() {
+	echo "usage: restore file" >&2
+	exit 1
+}
+
+#if argument equals to 0 then...
+if [ $# -eq 0 ]; then
+	echo "restore: missing arguments" >&2
+	usage
+fi
+
+
+#if not in recycle bin (the argument passed in)
+if [ ! -f "$HOME/recyclebin/$1" ]; then
+	echo "restore: cannot restore '$1': No such file in recyclebin" >&2
+	exit 1
+fi
+
+restore_info=$(grep "^$1:" "$HOME/.restore.info")
+if [ -z "$restore_info" ]; then
+	echo "restore: no restore information for '$1'" >&2
+	exit 1
+fi
+
+original_path=$(echo "$restore_info" | cut -d: -f2-)
+
+mkdir -p "$(dirname "$original_path")" || {
+    echo "restore: cannot create directory for '$original_path'" >&2
+    exit 1
+}
+
+# Check if file already exists
+if [ -e "$original_path" ]; then
+    read -p "Do you want to overwrite? y/n " answer
+    case "$answer" in
+        [yY]*) ;;
+        *) exit 0 ;;
+    esac
+fi
+
+# Restore the file
+mv "$HOME/recyclebin/$1" "$original_path" || {
+    echo "restore: cannot restore '$1' to '$original_path'" >&2
+    exit 1
+}
+
+# Remove entry from .restore.info
+temp_file=$(mktemp)
+grep -v "^$1:" "$HOME/.restore.info" > "$temp_file"
+mv "$temp_file" "$HOME/.restore.info"
+
+exit 0
